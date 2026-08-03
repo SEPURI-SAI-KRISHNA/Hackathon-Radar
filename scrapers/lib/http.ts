@@ -64,23 +64,44 @@ export async function getText(url: string, opts: FetchOpts = {}): Promise<string
   return await res.text();
 }
 
-/** Walk paginated endpoints politely, stopping on empty page, cap, or a page that throws. */
+export interface Paged<T> {
+  items: T[];
+  /**
+   * Set only when pagination stopped because a page kept failing — i.e. rows
+   * are missing. Reaching the page cap or an empty page is a normal end and
+   * leaves this undefined.
+   */
+  truncated?: string;
+}
+
+/** Walk paginated endpoints politely, stopping on empty page, cap, or a page that keeps throwing. */
 export async function paginate<T>(
   fetchPage: (page: number) => Promise<T[]>,
   { maxPages = 20, delayMs = 350 } = {},
-): Promise<T[]> {
-  const all: T[] = [];
+): Promise<Paged<T>> {
+  const items: T[] = [];
+
   for (let page = 1; page <= maxPages; page++) {
     let batch: T[];
     try {
       batch = await fetchPage(page);
     } catch (err) {
-      debug(`page ${page} failed, keeping ${all.length} rows:`, (err as Error).message);
-      break;
+      // `request` has already retried, so reaching here mid-sweep usually means
+      // rate limiting rather than a dead endpoint. Back off well past a typical
+      // per-minute window and try the page once more before abandoning the rest.
+      debug(`page ${page} failed, backing off 20s:`, (err as Error).message);
+      await sleep(20_000);
+      try {
+        batch = await fetchPage(page);
+      } catch (retryErr) {
+        const reason = retryErr instanceof Error ? retryErr.message : String(retryErr);
+        return { items, truncated: `stopped at page ${page} of ${maxPages}: ${reason}` };
+      }
     }
     if (!batch.length) break;
-    all.push(...batch);
+    items.push(...batch);
     if (page < maxPages) await sleep(delayMs);
   }
-  return all;
+
+  return { items };
 }

@@ -110,6 +110,12 @@ export interface SourceReport {
   count: number;
   ms: number;
   error?: string;
+  /**
+   * Non-fatal coverage problems — the source returned data, but not all of it
+   * (rate limiting mid-pagination, typically). Without this a partial scrape is
+   * indistinguishable from a complete one, which is the worst outcome here.
+   */
+  warnings?: string[];
 }
 
 /** The file the site fetches: `public/data/hackathons.json`. */

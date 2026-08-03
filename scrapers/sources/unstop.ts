@@ -39,8 +39,8 @@ export default defineSource({
   name: 'Unstop',
   homepage: 'https://unstop.com',
 
-  async fetch() {
-    const rows = await paginate<UnstopRow>(
+  async fetch(ctx) {
+    const { items, truncated } = await paginate<UnstopRow>(
       async (page) => {
         const url =
           'https://unstop.com/api/public/opportunity/search-new' +
@@ -50,8 +50,11 @@ export default defineSource({
       },
       { maxPages: 25 },
     );
-    debug(`unstop: ${rows.length}`);
-    return rows.map(toRaw);
+
+    if (truncated) ctx.warn(`listing incomplete — ${truncated}`);
+
+    debug(`unstop: ${items.length}${truncated ? ' (truncated)' : ''}`);
+    return items.map(toRaw);
   },
 });
 

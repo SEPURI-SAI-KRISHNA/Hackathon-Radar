@@ -26,11 +26,19 @@ async function main() {
   const results = await Promise.all(
     sources.map(async (source): Promise<{ report: SourceReport; rows: TaggedRaw[] }> => {
       const t0 = Date.now();
+      const warnings: string[] = [];
       try {
-        const raw = await source.fetch();
+        const raw = await source.fetch({ warn: (m) => warnings.push(m) });
         const rows = raw.filter(isUsable).map((r) => tag(r, source.id, source.name));
         return {
-          report: { source: source.id, sourceName: source.name, ok: true, count: rows.length, ms: Date.now() - t0 },
+          report: {
+            source: source.id,
+            sourceName: source.name,
+            ok: true,
+            count: rows.length,
+            ms: Date.now() - t0,
+            warnings: warnings.length ? warnings : undefined,
+          },
           rows,
         };
       } catch (err) {
@@ -50,9 +58,10 @@ async function main() {
   );
 
   for (const { report } of results) {
-    const status = report.ok ? '✓' : '✗';
+    const status = report.ok ? (report.warnings ? '!' : '✓') : '✗';
     const detail = report.ok ? `${report.count} events` : report.error;
     console.log(`  ${status} ${report.sourceName.padEnd(24)} ${String(detail).slice(0, 90)}  (${report.ms}ms)`);
+    for (const w of report.warnings ?? []) console.log(`      ↳ ${w}`);
   }
 
   const allRows = results.flatMap((r) => r.rows);
@@ -105,10 +114,12 @@ async function main() {
   const added = hackathons.filter((h) => h.firstSeenAt === now.toISOString()).length;
   const online = hackathons.filter((h) => h.mode === 'online' || h.mode === 'hybrid').length;
   const failed = results.filter((r) => !r.report.ok).length;
+  const partial = results.filter((r) => r.report.warnings?.length).length;
 
   console.log(
     `\n${allRows.length} rows → ${hackathons.length} unique (${online} online/hybrid, ${added} new)` +
       `${failed ? `, ${failed} source(s) failed` : ''}` +
+      `${partial ? `, ${partial} source(s) partial` : ''}` +
       `\nWrote ${OUTPUT} in ${((Date.now() - startedAt) / 1000).toFixed(1)}s`,
   );
 

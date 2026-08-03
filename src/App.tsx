@@ -95,6 +95,9 @@ export default function App() {
   }, [all, entries]);
 
   const failedSources = data?.sources.filter((s) => !s.ok) ?? [];
+  // Succeeded but returned less than everything — worth flagging separately,
+  // since a partial scrape otherwise looks identical to a complete one.
+  const partialSources = data?.sources.filter((s) => s.ok && s.warnings?.length) ?? [];
 
   return (
     <div className="app">
@@ -139,6 +142,16 @@ export default function App() {
           <span>
             {failedSources.length} source{failedSources.length > 1 ? 's' : ''} failed on the last refresh:{' '}
             {failedSources.map((s) => s.sourceName).join(', ')}. Coverage may be incomplete.
+          </span>
+        </div>
+      )}
+
+      {partialSources.length > 0 && (
+        <div className="banner warn">
+          <span>
+            Partial data from {partialSources.map((s) => s.sourceName).join(', ')} — the site
+            answered but stopped early, usually rate limiting.{' '}
+            {partialSources.flatMap((s) => s.warnings ?? []).join(' · ')}
           </span>
         </div>
       )}

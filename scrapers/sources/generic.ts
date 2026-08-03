@@ -35,16 +35,20 @@ export default defineSource({
   name: 'Web (schema.org)',
   homepage: '',
 
-  async fetch() {
+  async fetch(ctx) {
     const byUrl = new Map<string, RawHackathon>();
 
     for (const page of PAGES) {
+      const before = byUrl.size;
+      let unreachable: string | undefined;
+
       for (let n = 1; n <= (page.pages ?? 1); n++) {
         let html: string;
         try {
           html = await getText(page.url.replace('{page}', String(n)), { retries: 2 });
         } catch (err) {
-          debug(`${page.label} p${n} unreachable:`, (err as Error).message);
+          unreachable = (err as Error).message;
+          debug(`${page.label} p${n} unreachable:`, unreachable);
           break; // Later pages of an unreachable listing won't work either.
         }
 
@@ -56,7 +60,14 @@ export default defineSource({
         // Pagination past the end repeats the last page; stop when nothing is new.
         if (!usable.length) break;
       }
+
+      // A configured page contributing nothing is either a block, a layout
+      // change, or a genuinely empty listing. All three are worth knowing about
+      // — otherwise the source reports a clean zero and looks healthy.
+      if (unreachable) ctx.warn(`${page.label} unreachable — ${unreachable}`);
+      else if (byUrl.size === before) ctx.warn(`${page.label} returned no events`);
     }
+
     return [...byUrl.values()];
   },
 });

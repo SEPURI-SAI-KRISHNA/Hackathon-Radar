@@ -38,19 +38,26 @@ export default defineSource({
   name: 'Devpost',
   homepage: 'https://devpost.com',
 
-  async fetch() {
+  async fetch(ctx) {
     const rows: DevpostHackathon[] = [];
 
     for (const q of QUERIES) {
-      const batch = await paginate<DevpostHackathon>(async (page) => {
+      const sweep = `${q.challenge_type}/${q.status}`;
+      const { items, truncated } = await paginate<DevpostHackathon>(async (page) => {
         const url =
           `https://devpost.com/api/hackathons?challenge_type[]=${q.challenge_type}` +
           `&status[]=${q.status}&page=${page}`;
         const data = await getJSON<{ hackathons?: DevpostHackathon[] }>(url);
         return data.hackathons ?? [];
       });
-      debug(`devpost ${q.challenge_type}/${q.status}: ${batch.length}`);
-      rows.push(...batch);
+
+      // Devpost rate-limits by IP, and CI runners share addresses with the
+      // world — a truncated sweep there is common and must not look like a
+      // complete one.
+      if (truncated) ctx.warn(`${sweep} incomplete — ${truncated}`);
+
+      debug(`devpost ${sweep}: ${items.length}${truncated ? ' (truncated)' : ''}`);
+      rows.push(...items);
     }
 
     return rows.map(toRaw);
