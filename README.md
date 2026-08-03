@@ -107,8 +107,10 @@ openssl rand -hex 24                       # generate one
 npx wrangler pages secret put TRACKER_SECRET
 ```
 
-**4. Bind D1 to the Pages project** — dashboard → your project → *Settings →
-Bindings → Add → D1 database*, variable name `DB`, database `hackathon-tracker`.
+**4. Check the project name matches.** `name` in `wrangler.toml` must equal the
+Pages project name, and `npx wrangler pages project list` will tell you what it
+actually is. The D1 binding itself needs no dashboard step — once a Wrangler
+config file exists, Pages reads bindings from it and ignores dashboard bindings.
 
 **5. Open the site**, track anything, and paste the secret into the "Tracker key"
 banner. It's stored in `localStorage`; enter it once per device.
