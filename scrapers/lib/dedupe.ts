@@ -41,7 +41,7 @@ export function makeId(key: string): string {
 
 /** Higher wins when two sources disagree on a field. Richer APIs rank above HTML scrapes. */
 const SOURCE_CONFIDENCE: Record<string, number> = {
-  devpost: 100, devfolio: 95, unstop: 90, hackerearth: 85, mlh: 70, ethglobal: 65, schemaorg: 40,
+  devpost: 100, devfolio: 95, unstop: 90, mlh: 70, ethglobal: 65, schemaorg: 40,
 };
 
 const confidence = (source: string) => SOURCE_CONFIDENCE[source] ?? 50;

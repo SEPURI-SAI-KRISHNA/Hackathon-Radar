@@ -36,13 +36,18 @@ you configure D1 (below), at which point it syncs across devices.
 | Unstop | Public JSON API | India-heavy. Eligibility filters used to detect student-only events. |
 | MLH | schema.org microdata | Student hackathons — all flagged `studentOnly`, hidden by default. |
 | ETHGlobal | HTML card parse | Web3. Conferences and meetups on the same page are filtered out. |
-| HackerEarth | Browser-extension JSON feed | Small; HackerEarth runs few public hackathons at a time. |
 | Eventbrite | JSON-LD (`schema.org/Event`) | Via the generic adapter — see below. |
 
 **Not included, and why:** lablab.ai, Kaggle, Taikai and Hack2skill sit behind
 Cloudflare bot protection or reCAPTCHA and return a challenge page to any plain
 HTTP client. DoraHacks exposes no public listing endpoint. Adding them would
 need a headless browser; the scraper is deliberately dependency-free.
+
+HackerEarth was dropped for a subtler reason: its feed returns `200` from a home
+connection but `403` from GitHub Actions runners, so every scheduled refresh
+raised a warning banner for a source that contributed one or two events. A
+warning you see every time is one you stop reading. `git log -- scrapers/sources/hackerearth.ts`
+has the module if you ever want it back for local-only runs.
 
 ### Adding a source
 
