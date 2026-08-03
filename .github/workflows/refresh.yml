@@ -11,6 +11,8 @@ concurrency:
   group: refresh
   cancel-in-progress: false
 
+# Needed to push the refreshed dataset back. If the commit step 403s, also set
+# Settings -> Actions -> General -> Workflow permissions to "Read and write".
 permissions:
   contents: write
 
