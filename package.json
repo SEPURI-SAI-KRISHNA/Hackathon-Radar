@@ -1,0 +1,28 @@
+{
+  "name": "hackathons-discover",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b tsconfig.app.json && vite build",
+    "preview": "vite preview",
+    "refresh": "tsx scrapers/index.ts",
+    "refresh:verbose": "DEBUG=1 tsx scrapers/index.ts",
+    "typecheck": "tsc -b tsconfig.app.json tsconfig.node.json --pretty"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250109.0",
+    "@types/node": "^22.20.1",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.7"
+  }
+}

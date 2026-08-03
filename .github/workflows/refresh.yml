@@ -1,0 +1,50 @@
+name: Refresh hackathons
+
+on:
+  schedule:
+    # 06:00 UTC every second day. Cloudflare Pages redeploys on the commit.
+    - cron: '0 6 */2 * *'
+  workflow_dispatch: # "Run workflow" button, for an on-demand refresh.
+
+# Only one refresh at a time — two concurrent runs would race on the commit.
+concurrency:
+  group: refresh
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Scrapers exit non-zero if every source failed, which fails the job
+      # and leaves the previous good dataset committed.
+      - name: Scrape all sources
+        run: npm run refresh
+        env:
+          DEBUG: '1'
+
+      - name: Commit updated dataset
+        run: |
+          if git diff --quiet -- public/data/hackathons.json; then
+            echo "No changes in this refresh."
+            exit 0
+          fi
+          count=$(node -p "require('./public/data/hackathons.json').count")
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/data/hackathons.json
+          git commit -m "data: refresh hackathons (${count} events)"
+          git push

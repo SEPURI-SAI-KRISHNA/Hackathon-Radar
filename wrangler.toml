@@ -1,0 +1,14 @@
+name = "hackathon-radar"
+compatibility_date = "2026-01-15"
+pages_build_output_dir = "dist"
+
+# Created with: wrangler d1 create hackathon-tracker
+# Paste the returned database_id below, then apply schema.sql.
+[[d1_databases]]
+binding = "DB"
+database_name = "hackathon-tracker"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+
+# TRACKER_SECRET is a secret, not a var — set it with:
+#   wrangler pages secret put TRACKER_SECRET
+# (or in the Cloudflare dashboard under Settings → Variables and Secrets)
