@@ -93,6 +93,11 @@ function placeholder(seed: string): Response {
       'Content-Type': 'image/svg+xml; charset=utf-8',
       // Shorter than a real image: a URL that 404s today may be fixed upstream.
       'Cache-Control': 'public, max-age=3600, s-maxage=86400',
+      // SVG is a document format, so a same-origin one gets locked down even
+      // though this one is generated from escaped text. `_headers` does not
+      // reach Function responses, so it has to be said here.
+      'X-Content-Type-Options': 'nosniff',
+      'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox",
     },
   });
 }

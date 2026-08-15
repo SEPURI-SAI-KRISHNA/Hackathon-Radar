@@ -1,5 +1,6 @@
 import type { Dataset, Hackathon } from '../../shared/types';
 import { slugOf } from '../../shared/slug';
+import { securityHeaders } from '../../shared/headers';
 
 /**
  * Serves `/h/<slug>`: the same SPA shell, but with this event's title,
@@ -20,21 +21,6 @@ const SITE_NAME = 'Hackathon Radar';
 /** Short at the browser, longer at the edge — the dataset changes every 2 days. */
 const CACHE_CONTROL = 'public, max-age=300, s-maxage=3600';
 
-/**
- * `public/_headers` only covers static assets, and this route is a Function —
- * so the same protections have to be repeated here or event pages would be the
- * one part of the site served without them. Keep the two in step.
- */
-const securityHeaders = (scriptSrc: string): Record<string, string> => ({
-  'Content-Security-Policy':
-    "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; " +
-    `img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src ${scriptSrc}; connect-src 'self'; font-src 'self'`,
-  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
-  'X-Content-Type-Options': 'nosniff',
-  'X-Frame-Options': 'DENY',
-  'Referrer-Policy': 'strict-origin-when-cross-origin',
-});
-
 export const onRequestGet: PagesFunction<Env> = async ({ request, env, params }) => {
   const url = new URL(request.url);
   const slug = decodeURIComponent(String(params.slug ?? ''));
@@ -51,7 +37,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, params })
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
         'Cache-Control': 'public, max-age=60',
-        ...securityHeaders("'self'"),
+        ...securityHeaders(),
       },
     });
   }

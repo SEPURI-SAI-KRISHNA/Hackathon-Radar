@@ -217,19 +217,21 @@ CI never needs it: the workflow commits, it never merges.
 scrapers/
   index.ts            refresh pipeline: fetch -> dedupe -> enrich -> write
   lib/                http, schema.org parsing, enrichment, dedupe, sitemap
+  sources/            one module per platform (+ generic schema.org adapter)
 scripts/
   merge-generated.mjs git merge driver for the two generated artifacts
-  sources/            one module per platform (+ generic schema.org adapter)
 shared/types.ts       the data model, shared by scrapers, API and UI
 shared/slug.ts        /h/<slug> derivation, shared by all three too
+shared/headers.ts     security headers for Function responses (_headers misses them)
+shared/shell.ts       serves the SPA shell for /tracker and /sources
 src/                  React app (filters, cards, detail page, tracker)
   lib/router.ts       the 40-line router behind /h/<slug>, /tracker, /sources
 functions/api/        Pages Functions: D1 tracker, thumbnail proxy
 functions/h/[slug].ts renders one event's title, preview tags and JSON-LD
+functions/sources.ts  /sources and /tracker: the shell, for client-side routing
+public/_headers       CSP and the rest of the security headers (static assets only)
 public/data/          the generated dataset, committed so the site is static
 public/sitemap.xml    generated alongside it, one entry per live event
-public/_headers       CSP and the rest of the security headers
-public/_redirects     the two client-side routes with no file of their own
 schema.sql            D1 table
 ```
 
@@ -241,8 +243,19 @@ before it reaches the browser — so a link pasted into Slack or picked up by a
 crawler describes the hackathon rather than the site. An unknown slug returns a
 real `404`, not an empty page with a `200`.
 
-`_redirects` deliberately has no `/*` catch-all: only `/tracker` and `/sources`
-are rewritten to the shell, so every other unmatched path still 404s properly.
+`/tracker` and `/sources` are client-side routes with no file of their own, so
+each has a one-line Function that returns the shell. A `_redirects` rewrite is
+the obvious way to do that and **doesn't work**: Pages canonicalises
+`/index.html` to `/`, so `/sources /index.html 200` collapses into a 308 to the
+home page. There is deliberately no `/*` catch-all either — every other
+unmatched path still 404s properly.
+
+One more Pages behaviour worth knowing: **`public/_headers` applies to static
+assets only.** A Function's response gets none of it, which is why every
+Function here sets its own headers from
+[`shared/headers.ts`](shared/headers.ts). Confirmed against the deployment —
+`/robots.txt` carries HSTS and XFO, a Function response carries only what it
+sets itself.
 
 `public/og.png` is the shared-link card, rendered by the portfolio's generator so
 every project of mine previews the same way — regenerate it with:
