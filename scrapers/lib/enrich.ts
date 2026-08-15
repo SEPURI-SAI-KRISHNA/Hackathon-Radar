@@ -23,20 +23,34 @@ export function parsePrize(raw?: string | number | null): Prize {
   if (!text) return {};
 
   let currency = 'USD';
+  let stated = false;
   for (const [sym, code] of Object.entries(SYMBOL_CURRENCY)) {
-    if (text.includes(sym)) { currency = code; break; }
+    if (text.includes(sym)) { currency = code; stated = true; break; }
   }
   const codeMatch = text.match(/\b(USD|EUR|GBP|INR|CAD|AUD|SGD|JPY|CNY|AED|CHF|BRL|KRW|NGN|ZAR)\b/i);
-  if (codeMatch) currency = codeMatch[1].toUpperCase();
-  if (/\b(rs\.?|rupees?|inr)\b/i.test(text)) currency = 'INR';
+  if (codeMatch) { currency = codeMatch[1].toUpperCase(); stated = true; }
+  if (/\b(rs\.?|rupees?|inr)\b/i.test(text)) { currency = 'INR'; stated = true; }
+
+  // Prose in the prize field ("…sponsored for 1 year", "…until Round 2") would
+  // otherwise contribute its stray digits as a $1 or $2 prize. With no currency
+  // marker anywhere in a sentence-length value, there is no figure to trust.
+  if (!stated && text.length > 60) return { raw: text };
+
+  // Placements and years are not amounts. Sources put "3rd Prize", "Top 50" and
+  // even "HackSpire'26" in the prize field, and reading those as $3, $50 and $26
+  // both shows a nonsense figure and poisons sorting by prize.
+  const amounts = text
+    .replace(/\b\d+\s*(?:st|nd|rd|th)\b/gi, ' ')
+    .replace(/\b(?:top|rank(?:ed)?|position|place)\s*#?\s*\d+\b/gi, ' ')
+    .replace(/'\d{2}\b/g, ' ');
 
   // Indian numbering: "5 lakh" = 5e5, "2 crore" = 2e7.
-  const lakh = text.match(/([\d.,]+)\s*(lakhs?|lacs?)/i);
-  const crore = text.match(/([\d.,]+)\s*crores?/i);
+  const lakh = amounts.match(/([\d.,]+)\s*(lakhs?|lacs?)/i);
+  const crore = amounts.match(/([\d.,]+)\s*crores?/i);
   // Western shorthand: "50K", "1.2M".
-  const short = text.match(/([\d.,]+)\s*([KkMm])\b/);
+  const short = amounts.match(/([\d.,]+)\s*([KkMm])\b/);
   // Plain, longest run of digits wins ("$2,000,000" beats a stray "2026").
-  const plain = [...text.matchAll(/[\d][\d,]*(?:\.\d+)?/g)]
+  const plain = [...amounts.matchAll(/[\d][\d,]*(?:\.\d+)?/g)]
     .map((m) => m[0])
     .sort((a, b) => b.replace(/\D/g, '').length - a.replace(/\D/g, '').length)[0];
 
@@ -130,6 +144,14 @@ export function inferMode(text?: string | null, fallback: Mode = 'unknown'): Mod
 }
 
 /**
+ * How long an event with a start date but no end date is believed to still be
+ * running. Without this cap every such listing stays `ongoing` forever, so a
+ * hackathon that quietly finished last year looks exactly like one running
+ * today — and `ongoing` becomes the bucket that hides everything.
+ */
+const OPEN_ENDED_ONGOING_DAYS = 60;
+
+/**
  * Derived from dates, not from the source's own label — sources go stale,
  * and a listing that says "open" three weeks after its deadline is common.
  */
@@ -145,7 +167,13 @@ export function deriveStatus(
   const r = ts(regEnds);
 
   if (e !== undefined && t > e) return 'ended';
-  if (s !== undefined && t >= s) return e === undefined || t <= e ? 'ongoing' : 'ended';
+  if (s !== undefined && t >= s) {
+    if (e !== undefined) return 'ongoing';
+    // No end date. An open registration deadline still ahead of us is proof
+    // it's live; otherwise trust it only for a bounded window after the start.
+    if (r !== undefined && t <= r) return 'ongoing';
+    return t - s > OPEN_ENDED_ONGOING_DAYS * 86_400_000 ? 'ended' : 'ongoing';
+  }
   // Not started yet: "open" means you can still register.
   if (r !== undefined) return t <= r ? 'open' : 'upcoming';
   if (s !== undefined) return 'open';

@@ -74,6 +74,17 @@ export interface Paged<T> {
   truncated?: string;
 }
 
+/**
+ * How long to wait after a page fails, in order. `request` has already burned
+ * its own fast retries by then, so reaching here mid-sweep almost always means
+ * rate limiting — these back off past a per-minute *and* a per-few-minute
+ * window before giving up on the rest of the pages.
+ */
+const PAGE_BACKOFF_MS = [20_000, 45_000];
+
+/** A 4xx that isn't 429 is a blocked or changed endpoint — waiting won't help. */
+const isPermanent = (err: unknown) => err instanceof Error && /HTTP 4(?!29)/.test(err.message);
+
 /** Walk paginated endpoints politely, stopping on empty page, cap, or a page that keeps throwing. */
 export async function paginate<T>(
   fetchPage: (page: number) => Promise<T[]>,
@@ -82,21 +93,27 @@ export async function paginate<T>(
   const items: T[] = [];
 
   for (let page = 1; page <= maxPages; page++) {
-    let batch: T[];
-    try {
-      batch = await fetchPage(page);
-    } catch (err) {
-      // `request` has already retried, so reaching here mid-sweep usually means
-      // rate limiting rather than a dead endpoint. Back off well past a typical
-      // per-minute window and try the page once more before abandoning the rest.
-      debug(`page ${page} failed, backing off 20s:`, (err as Error).message);
-      await sleep(20_000);
+    let batch: T[] | undefined;
+    let lastError: unknown;
+
+    for (let attempt = 0; attempt <= PAGE_BACKOFF_MS.length; attempt++) {
+      if (attempt > 0) {
+        const wait = PAGE_BACKOFF_MS[attempt - 1];
+        debug(`page ${page} failed, backing off ${wait / 1000}s:`, (lastError as Error).message);
+        await sleep(wait);
+      }
       try {
         batch = await fetchPage(page);
-      } catch (retryErr) {
-        const reason = retryErr instanceof Error ? retryErr.message : String(retryErr);
-        return { items, truncated: `stopped at page ${page} of ${maxPages}: ${reason}` };
+        break;
+      } catch (err) {
+        lastError = err;
+        if (isPermanent(err)) break;
       }
+    }
+
+    if (batch === undefined) {
+      const reason = lastError instanceof Error ? lastError.message : String(lastError);
+      return { items, truncated: `stopped at page ${page} of ${maxPages}: ${reason}` };
     }
     if (!batch.length) break;
     items.push(...batch);

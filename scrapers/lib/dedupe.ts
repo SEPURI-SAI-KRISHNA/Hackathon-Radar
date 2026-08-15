@@ -7,7 +7,7 @@ export type TaggedRaw = RawHackathon & { source: string; sourceName: string };
 /** Fields the runner derives itself, so merging doesn't need to produce them. */
 export type MergedCore = Omit<
   Hackathon,
-  'status' | 'themes' | 'eligibility' | 'firstSeenAt' | 'lastSeenAt' | 'durationDays'
+  'slug' | 'status' | 'themes' | 'eligibility' | 'firstSeenAt' | 'lastSeenAt' | 'durationDays'
 >;
 
 /** Words that carry no identity — "Hack the Future Hackathon 2026" ≈ "Hack the Future 2026". */

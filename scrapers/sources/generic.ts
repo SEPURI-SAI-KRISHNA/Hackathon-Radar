@@ -17,18 +17,15 @@ interface Page {
  * microdata — is picked up here with no new code, because that markup is
  * what search engines read and most event platforms emit it.
  *
- * To add a site: append an entry, run `npm run refresh:verbose`, and check
+ * To add a site: append an entry, re-register this source in
+ * [`sources/index.ts`](./index.ts), run `npm run refresh:verbose`, and check
  * the per-page count. A zero means the page renders client-side, which needs
  * a dedicated source module instead (see `devfolio.ts` for the shape).
+ *
+ * Currently empty, so the source is unregistered — see the README for why
+ * Eventbrite was removed.
  */
-const PAGES: Page[] = [
-  {
-    url: 'https://www.eventbrite.com/d/online/hackathon/?page={page}',
-    label: 'Eventbrite (online hackathons)',
-    pages: 5,
-    defaultMode: 'online',
-  },
-];
+const PAGES: Page[] = [];
 
 export default defineSource({
   id: 'schemaorg',

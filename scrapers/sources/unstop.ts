@@ -108,9 +108,25 @@ const tagNames = (tags?: UnstopRow['tags']): string[] =>
     .map((t) => (typeof t === 'string' ? t : t?.name))
     .filter((t): t is string => Boolean(t));
 
+/**
+ * Unstop's `currency` field holds a Font Awesome icon class, not a code —
+ * "fa-rupee". Left alone it ends up in the prize string a visitor reads.
+ */
+const CURRENCY_ICONS: Record<string, string> = {
+  rupee: 'INR', 'rupee-sign': 'INR', inr: 'INR',
+  dollar: 'USD', 'dollar-sign': 'USD', usd: 'USD',
+  euro: 'EUR', 'euro-sign': 'EUR', pound: 'GBP', 'pound-sign': 'GBP', yen: 'JPY',
+};
+
+function currencyCode(value?: string): string {
+  const raw = value?.trim() ?? '';
+  if (/^[A-Za-z]{3}$/.test(raw)) return raw.toUpperCase();
+  return CURRENCY_ICONS[raw.replace(/^fa[srlbd]?-/i, '').toLowerCase()] ?? 'INR';
+}
+
 function bestPrize(prizes?: UnstopRow['prizes']) {
   if (!prizes?.length) return undefined;
-  const currency = prizes.find((p) => p.currency)?.currency ?? 'INR';
+  const currency = currencyCode(prizes.find((p) => p.currency)?.currency);
   const parsed = prizes
     .map((p) => parsePrize(p.cash ? `${currency} ${p.cash}` : p.others))
     .filter((p) => p.usd !== undefined)

@@ -1,0 +1,6 @@
+# Client-side routes that have no file of their own: serve the app shell with a
+# 200 so a reload or a pasted link works. Deliberately *not* a `/*` catch-all —
+# everything else falls through to 404.html with a real 404, and `/h/<slug>` is
+# handled by functions/h/[slug].ts, which renders that event's preview tags.
+/tracker  /index.html  200
+/sources  /index.html  200

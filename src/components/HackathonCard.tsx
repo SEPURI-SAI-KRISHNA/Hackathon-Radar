@@ -1,5 +1,8 @@
 import { memo, useState } from 'react';
 import type { Hackathon, TrackEntry, TrackStatus } from '../../shared/types';
+import { pathOf } from '../../shared/slug';
+import { imageSrc } from '../lib/dataset';
+import { linkProps } from '../lib/router';
 import { TRACK_LABELS, TRACK_STATUSES } from '../lib/tracker';
 import {
   daysUntil, deadlineOf, formatDateRange, formatDeadline,
@@ -26,13 +29,15 @@ function Card({ hackathon: h, entry, onTrack }: Props) {
   return (
     <article className={`card${entry ? ' tracked' : ''}`}>
       <div className="card-top">
-        {h.imageUrl && (
-          <img className="thumb" src={h.imageUrl} alt="" loading="lazy"
-               onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-        )}
+        {/* Proxied, never hot-linked — and the proxy draws a placeholder for
+            the handful of events that have no image at all. */}
+        {/* Hidden rather than left broken if the proxy itself is unreachable —
+            which is the case under `npm run dev`, where Functions don't run. */}
+        <img className="thumb" src={imageSrc(h)} alt="" loading="lazy" width={46} height={46}
+             onError={(e) => { e.currentTarget.style.display = 'none'; }} />
         <div style={{ minWidth: 0, flex: 1 }}>
           <h3 className="card-title">
-            <a href={h.url} target="_blank" rel="noopener noreferrer">{h.title}</a>
+            <a {...linkProps(pathOf(h))}>{h.title}</a>
           </h3>
           {h.organizer && <div className="card-org">{h.organizer}</div>}
         </div>
@@ -78,6 +83,7 @@ function Card({ hackathon: h, entry, onTrack }: Props) {
 
       <div className="card-foot">
         <a className="apply" href={h.url} target="_blank" rel="noopener noreferrer">Open ↗</a>
+        <a className="link-btn" {...linkProps(pathOf(h))}>Details</a>
 
         <select
           className="status-select"

@@ -2,12 +2,17 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Dataset, Hackathon, RawHackathon, SourceReport } from '../shared/types.ts';
+import { makeSlug } from '../shared/slug.ts';
 import { classifyThemes, deriveStatus, durationDays, inferEligibility } from './lib/enrich.ts';
 import { identityKey, makeId, mergeGroup, type TaggedRaw } from './lib/dedupe.ts';
 import { sources } from './sources/index.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUTPUT = resolve(ROOT, 'public/data/hackathons.json');
+const SITEMAP = resolve(ROOT, 'public/sitemap.xml');
+
+/** Absolute origin, needed for the sitemap. Override when the domain changes. */
+const SITE_URL = (process.env.SITE_URL ?? 'https://hackathon-radar-e0u.pages.dev').replace(/\/$/, '');
 
 /** Events that finished longer ago than this are dropped from the dataset. */
 const KEEP_ENDED_DAYS = 30;
@@ -34,7 +39,9 @@ async function main() {
           report: {
             source: source.id,
             sourceName: source.name,
-            ok: true,
+            // Rows came back, but a warning means some of them are missing —
+            // that is a degraded run, not a successful one.
+            status: warnings.length ? 'degraded' : 'ok',
             count: rows.length,
             ms: Date.now() - t0,
             warnings: warnings.length ? warnings : undefined,
@@ -46,7 +53,7 @@ async function main() {
           report: {
             source: source.id,
             sourceName: source.name,
-            ok: false,
+            status: 'failed',
             count: 0,
             ms: Date.now() - t0,
             error: err instanceof Error ? err.message : String(err),
@@ -58,8 +65,8 @@ async function main() {
   );
 
   for (const { report } of results) {
-    const status = report.ok ? (report.warnings ? '!' : '✓') : '✗';
-    const detail = report.ok ? `${report.count} events` : report.error;
+    const status = report.status === 'ok' ? '✓' : report.status === 'degraded' ? '!' : '✗';
+    const detail = report.status === 'failed' ? report.error : `${report.count} events`;
     console.log(`  ${status} ${report.sourceName.padEnd(24)} ${String(detail).slice(0, 90)}  (${report.ms}ms)`);
     for (const w of report.warnings ?? []) console.log(`      ↳ ${w}`);
   }
@@ -88,6 +95,7 @@ async function main() {
     hackathons.push({
       ...core,
       id,
+      slug: makeSlug(core.title, id),
       description: core.description?.slice(0, MAX_DESCRIPTION),
       status,
       durationDays: durationDays(core.startsAt, core.endsAt),
@@ -110,17 +118,18 @@ async function main() {
 
   await mkdir(dirname(OUTPUT), { recursive: true });
   await writeFile(OUTPUT, JSON.stringify(dataset, null, 0));
+  await writeFile(SITEMAP, sitemap(hackathons, now));
 
   const added = hackathons.filter((h) => h.firstSeenAt === now.toISOString()).length;
   const online = hackathons.filter((h) => h.mode === 'online' || h.mode === 'hybrid').length;
-  const failed = results.filter((r) => !r.report.ok).length;
-  const partial = results.filter((r) => r.report.warnings?.length).length;
+  const failed = results.filter((r) => r.report.status === 'failed').length;
+  const degraded = results.filter((r) => r.report.status === 'degraded').length;
 
   console.log(
     `\n${allRows.length} rows → ${hackathons.length} unique (${online} online/hybrid, ${added} new)` +
       `${failed ? `, ${failed} source(s) failed` : ''}` +
-      `${partial ? `, ${partial} source(s) partial` : ''}` +
-      `\nWrote ${OUTPUT} in ${((Date.now() - startedAt) / 1000).toFixed(1)}s`,
+      `${degraded ? `, ${degraded} source(s) degraded` : ''}` +
+      `\nWrote ${OUTPUT} and ${SITEMAP} in ${((Date.now() - startedAt) / 1000).toFixed(1)}s`,
   );
 
   // A total wipe-out means something systemic broke; don't let CI publish it silently.
@@ -128,6 +137,31 @@ async function main() {
     console.error('\nNo hackathons collected — refusing to treat this as success.');
     process.exitCode = 1;
   }
+}
+
+/**
+ * One entry per event page plus the home page. Ended events are left out —
+ * they're still in the dataset for a month, but there's nothing to enter.
+ */
+function sitemap(hackathons: Hackathon[], now: Date): string {
+  const day = now.toISOString().slice(0, 10);
+  const urls = hackathons
+    .filter((h) => h.status !== 'ended')
+    .map(
+      (h) =>
+        `  <url><loc>${SITE_URL}/h/${h.slug}</loc>` +
+        `<lastmod>${h.lastSeenAt.slice(0, 10)}</lastmod>` +
+        `<changefreq>weekly</changefreq></url>`,
+    );
+
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    `  <url><loc>${SITE_URL}/</loc><lastmod>${day}</lastmod><changefreq>daily</changefreq><priority>1.0</priority></url>`,
+    ...urls,
+    '</urlset>',
+    '',
+  ].join('\n');
 }
 
 function tag(raw: RawHackathon, source: string, sourceName: string): TaggedRaw {

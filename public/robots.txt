@@ -1,0 +1,7 @@
+# Hackathon Radar — https://hackathon-radar-e0u.pages.dev
+User-agent: *
+Allow: /
+# Personal tracker API and the thumbnail proxy: nothing to index.
+Disallow: /api/
+
+Sitemap: https://hackathon-radar-e0u.pages.dev/sitemap.xml

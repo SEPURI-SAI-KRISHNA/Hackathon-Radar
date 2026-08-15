@@ -60,6 +60,8 @@ export interface SourceRef {
 export interface Hackathon {
   /** Stable across refreshes: derived from the normalized title + start date. */
   id: string;
+  /** URL segment for `/h/<slug>`. Derived from title + id — see `shared/slug.ts`. */
+  slug: string;
   title: string;
   /** Canonical link to apply — the highest-confidence source's URL. */
   url: string;
@@ -96,26 +98,32 @@ export interface Hackathon {
 /** What a source plugin returns. The runner fills in everything derived. */
 export type RawHackathon = Omit<
   Hackathon,
-  'id' | 'status' | 'themes' | 'eligibility' | 'sources' | 'firstSeenAt' | 'lastSeenAt' | 'durationDays' | 'prize'
+  | 'id' | 'slug' | 'status' | 'themes' | 'eligibility' | 'sources'
+  | 'firstSeenAt' | 'lastSeenAt' | 'durationDays' | 'prize'
 > & {
   sourceId: string;
   prize?: Prize;
   eligibility?: Partial<Eligibility>;
 };
 
+/**
+ * `degraded` is the important one: the source answered and returned rows, but
+ * not all of them. Collapsing that into `ok` makes a scrape that fetched 15% of
+ * its pages look identical to a complete one, which is the worst outcome here.
+ */
+export type SourceStatus = 'ok' | 'degraded' | 'failed';
+
 export interface SourceReport {
   source: string;
   sourceName: string;
-  ok: boolean;
+  status: SourceStatus;
   count: number;
   ms: number;
   error?: string;
-  /**
-   * Non-fatal coverage problems — the source returned data, but not all of it
-   * (rate limiting mid-pagination, typically). Without this a partial scrape is
-   * indistinguishable from a complete one, which is the worst outcome here.
-   */
+  /** Why the run is `degraded` — one line per coverage problem. */
   warnings?: string[];
+  /** Legacy field from datasets written before `status` existed. @deprecated */
+  ok?: boolean;
 }
 
 /** The file the site fetches: `public/data/hackathons.json`. */

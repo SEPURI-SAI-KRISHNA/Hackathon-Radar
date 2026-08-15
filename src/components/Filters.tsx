@@ -1,4 +1,5 @@
 import type { SourceReport, Status, Theme } from '../../shared/types';
+import { statusOf } from '../lib/dataset';
 import {
   ALL_STATUSES, ALL_THEMES, DEFAULT_FILTERS, STATUS_LABELS,
   type FilterState, type SortKey,
@@ -122,18 +123,27 @@ export function Filters({ value, onChange, sources, themeCounts }: Props) {
       <div className="filter-row">
         <span className="label">Sources</span>
         <div className="chips">
-          {sources.map((s) => (
-            <button
-              key={s.source}
-              className="chip"
-              aria-pressed={value.sources.includes(s.source)}
-              onClick={() => set('sources', toggle(value.sources, s.source))}
-              // A failed source contributed nothing to this dataset — say so on hover.
-              title={s.ok ? `${s.count} listings fetched` : `Failed: ${s.error ?? 'unknown error'}`}
-            >
-              {s.ok ? '' : '⚠ '}{s.sourceName}
-            </button>
-          ))}
+          {sources.map((s) => {
+            const status = statusOf(s);
+            return (
+              <button
+                key={s.source}
+                className="chip"
+                aria-pressed={value.sources.includes(s.source)}
+                onClick={() => set('sources', toggle(value.sources, s.source))}
+                // What this source contributed to the dataset you're looking at.
+                title={
+                  status === 'failed'
+                    ? `Failed: ${s.error ?? 'unknown error'}`
+                    : status === 'degraded'
+                      ? `${s.count} listings fetched, but incomplete — ${(s.warnings ?? []).join(' · ')}`
+                      : `${s.count} listings fetched`
+                }
+              >
+                {status === 'ok' ? '' : '⚠ '}{s.sourceName}
+              </button>
+            );
+          })}
         </div>
       </div>
     </section>
