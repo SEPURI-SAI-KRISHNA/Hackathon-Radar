@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "refresh": "tsx scrapers/index.ts",
     "refresh:verbose": "DEBUG=1 tsx scrapers/index.ts",
+    "setup:merge-driver": "git config merge.generated.name \"keep the newer generated artifact\" && git config merge.generated.driver \"node scripts/merge-generated.mjs %O %A %B %L %P\"",
     "typecheck": "tsc -b tsconfig.app.json tsconfig.node.json --pretty"
   },
   "dependencies": {

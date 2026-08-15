@@ -5,6 +5,7 @@ import type { Dataset, Hackathon, RawHackathon, SourceReport } from '../shared/t
 import { makeSlug } from '../shared/slug.ts';
 import { classifyThemes, deriveStatus, durationDays, inferEligibility } from './lib/enrich.ts';
 import { identityKey, makeId, mergeGroup, type TaggedRaw } from './lib/dedupe.ts';
+import { buildSitemap } from './lib/sitemap.ts';
 import { sources } from './sources/index.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -118,7 +119,8 @@ async function main() {
 
   await mkdir(dirname(OUTPUT), { recursive: true });
   await writeFile(OUTPUT, JSON.stringify(dataset, null, 0));
-  await writeFile(SITEMAP, sitemap(hackathons, now));
+  // Same `now` as `generatedAt`, so both artifacts carry one timestamp.
+  await writeFile(SITEMAP, buildSitemap(hackathons, now, SITE_URL));
 
   const added = hackathons.filter((h) => h.firstSeenAt === now.toISOString()).length;
   const online = hackathons.filter((h) => h.mode === 'online' || h.mode === 'hybrid').length;
@@ -137,31 +139,6 @@ async function main() {
     console.error('\nNo hackathons collected — refusing to treat this as success.');
     process.exitCode = 1;
   }
-}
-
-/**
- * One entry per event page plus the home page. Ended events are left out —
- * they're still in the dataset for a month, but there's nothing to enter.
- */
-function sitemap(hackathons: Hackathon[], now: Date): string {
-  const day = now.toISOString().slice(0, 10);
-  const urls = hackathons
-    .filter((h) => h.status !== 'ended')
-    .map(
-      (h) =>
-        `  <url><loc>${SITE_URL}/h/${h.slug}</loc>` +
-        `<lastmod>${h.lastSeenAt.slice(0, 10)}</lastmod>` +
-        `<changefreq>weekly</changefreq></url>`,
-    );
-
-  return [
-    '<?xml version="1.0" encoding="UTF-8"?>',
-    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-    `  <url><loc>${SITE_URL}/</loc><lastmod>${day}</lastmod><changefreq>daily</changefreq><priority>1.0</priority></url>`,
-    ...urls,
-    '</urlset>',
-    '',
-  ].join('\n');
 }
 
 function tag(raw: RawHackathon, source: string, sourceName: string): TaggedRaw {

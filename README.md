@@ -183,6 +183,32 @@ leaves the last good dataset in place rather than publishing an empty site.
 
 To change the cadence, edit the `cron` line. To run it yourself: `npm run refresh`.
 
+### Merge conflicts on the generated files
+
+CI commits `public/data/hackathons.json` and `public/sitemap.xml`; so does a
+local `npm run refresh`. Both files are rewritten wholesale — the JSON is a
+single line — so the moment both happen you get a conflict spanning the entire
+file, and neither side is reviewable.
+
+Run this **once per clone**:
+
+```bash
+npm run setup:merge-driver
+```
+
+That registers [`scripts/merge-generated.mjs`](scripts/merge-generated.mjs),
+which `.gitattributes` points both files at. The rule is *newest wins*: each
+side carries its scrape timestamp (`generatedAt` in the JSON, a `<!-- generated -->`
+comment in the sitemap, always the same instant), and the later scrape is kept.
+Both files therefore resolve to the same side, and a side with no timestamp —
+hand-edited, truncated — is refused so you resolve it yourself.
+
+It's deliberately **not** `merge=ours`. In a rebase git's "ours" is the upstream
+branch you're replaying onto, not your work, so an `ours` driver throws away the
+newer local dataset — the exact thing this prevents. The config can't be
+committed, so a fresh clone without that command just gets an ordinary conflict.
+CI never needs it: the workflow commits, it never merges.
+
 ---
 
 ## Project layout
@@ -190,7 +216,9 @@ To change the cadence, edit the `cron` line. To run it yourself: `npm run refres
 ```
 scrapers/
   index.ts            refresh pipeline: fetch -> dedupe -> enrich -> write
-  lib/                http, schema.org parsing, enrichment, dedupe
+  lib/                http, schema.org parsing, enrichment, dedupe, sitemap
+scripts/
+  merge-generated.mjs git merge driver for the two generated artifacts
   sources/            one module per platform (+ generic schema.org adapter)
 shared/types.ts       the data model, shared by scrapers, API and UI
 shared/slug.ts        /h/<slug> derivation, shared by all three too
